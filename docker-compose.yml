@@ -1,0 +1,110 @@
+# Docker Compose for LLM-Driven OpenFOAM Orchestration System
+# Based on design document Section 9.2
+
+version: "3.8"
+
+services:
+  # ==========================================================================
+  # API Server - Main orchestration service
+  # ==========================================================================
+  api:
+    build:
+      context: .
+      target: orchestration
+    ports:
+      - "8000:8000"
+    volumes:
+      - cases:/data/cases
+      - results:/data/results
+      - ./templates:/app/templates:ro
+      - ./logs:/app/logs
+    environment:
+      - USE_DOCKER_EXECUTOR=true
+      - MAX_CONCURRENT_JOBS=4
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OLLAMA_HOST=${OLLAMA_HOST:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4}
+      - LOG_LEVEL=INFO
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ==========================================================================
+  # Background Worker - Runs simulations asynchronously
+  # ==========================================================================
+  worker:
+    build:
+      context: .
+      target: orchestration
+    command: ["python3", "-m", "celery", "-A", "tasks", "worker", "--loglevel=info", "--concurrency=2"]
+    volumes:
+      - cases:/data/cases
+      - results:/data/results
+      - ./templates:/app/templates:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LOG_LEVEL=INFO
+    depends_on:
+      - redis
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Redis - Message broker and result backend
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  cases:
+    driver: local
+  results:
+    driver: local
+  redis-data:
+    driver: local
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  default:
+    driver: bridge

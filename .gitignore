@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Logs
+logs/
+*.log
+
+# Data directories
+/data/
+cases/
+results/
+*.foam
+
+# OpenFOAM
+processor*/
+0.orig/
+*.bak
+postProcessing/
+VTK/
+processor*
+dynamicCode/
+
+# Temporary
+*.tmp
+*.swp
+temp/
+tmp/
+
+# Node modules (if using any frontend tools)
+node_modules/
+
+# Docker
+.dockerignore
+
+# GitHub
+.github/workflows/*.local
+
+# Package managers
+poetry.lock
+Pipfile.lock
+
+# Documentation build files
+docs/_build/
+site/
