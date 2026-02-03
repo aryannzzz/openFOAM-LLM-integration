@@ -161,6 +161,10 @@ class LLMConverter:
                     content = content[4:]
             
             spec_dict = json.loads(content)
+            
+            # Transform LLM response to match our schema
+            spec_dict = self._transform_llm_schema(spec_dict)
+            
             spec = CFDSpecification(**spec_dict)
             
             return LLMConversionResponse(
@@ -173,6 +177,143 @@ class LLMConverter:
         except Exception as e:
             logger.error(f"Failed to parse LLM response: {e}")
             return self._mock_conversion(original_prompt)
+    
+    def _transform_llm_schema(self, raw: dict) -> dict:
+        """Transform LLM's raw JSON to match our CFDSpecification schema"""
+        
+        # Extract values from various formats GPT might return
+        geometry = raw.get("geometry", {})
+        flow = raw.get("flow", {})
+        solver = raw.get("solver", "simpleFoam")
+        
+        # Extract Reynolds number
+        re_val = flow.get("reynolds_number") or flow.get("Re") or flow.get("re") or 100
+        
+        # Extract geometry type
+        geom_type = geometry.get("type", "cylinder_2d")
+        if geom_type not in ["cylinder_2d", "cylinder_3d", "sphere", "flat_plate_2d", 
+                             "backward_facing_step", "channel_2d", "channel_3d",
+                             "airfoil_naca_4digit", "box_with_obstacle", "pipe_3d"]:
+            geom_type = "cylinder_2d"
+        
+        # Extract flow regime
+        regime = flow.get("regime") or flow.get("type", "laminar")
+        if regime in ["laminar", "creeping"]:
+            regime = "laminar"
+            turb_model = "none"
+        elif regime in ["turbulent", "turbulent_rans", "RANS"]:
+            regime = "turbulent_rans"
+            turb_model = "k_omega_sst"
+        else:
+            regime = "laminar" if re_val < 2300 else "turbulent_rans"
+            turb_model = "none" if re_val < 2300 else "k_omega_sst"
+        
+        # Check for LLM turbulence model
+        llm_turb = flow.get("turbulence_model") or flow.get("turbulenceModel", "")
+        if llm_turb.lower() == "laminar":
+            turb_model = "none"
+            regime = "laminar"
+        elif llm_turb.lower() in ["k-epsilon", "k_epsilon", "kepsilon"]:
+            turb_model = "k_epsilon"
+        elif llm_turb.lower() in ["k-omega", "k_omega", "k-omega-sst", "k_omega_sst"]:
+            turb_model = "k_omega_sst"
+        
+        # Time dependence
+        time_dep = flow.get("time_dependence", "steady")
+        if time_dep.lower() in ["transient", "unsteady"]:
+            time_dep = "transient"
+        else:
+            time_dep = "steady"
+        
+        # Solver type
+        if isinstance(solver, str):
+            solver_type = solver
+        else:
+            solver_type = solver.get("type", "simpleFoam")
+        
+        if solver_type not in ["simpleFoam", "pimpleFoam", "pisoFoam", "icoFoam", 
+                               "rhoSimpleFoam", "rhoPimpleFoam"]:
+            solver_type = "pimpleFoam" if time_dep == "transient" else "simpleFoam"
+        
+        # Fluid properties
+        fluid = raw.get("fluid", {})
+        nu = fluid.get("kinematic_viscosity") or fluid.get("nu") or 1.5e-5
+        rho = fluid.get("density") or fluid.get("rho") or 1.225
+        
+        # Characteristic length
+        L = geometry.get("characteristic_length") or geometry.get("diameter") or 0.01
+        
+        # Velocity
+        velocity = flow.get("velocity") or flow.get("U")
+        if velocity is None:
+            velocity = re_val * nu / L
+        if isinstance(velocity, (int, float)):
+            velocity = [velocity, 0, 0]
+        
+        # Build the proper CFDSpecification structure
+        name = f"{geom_type}_re{int(re_val)}"
+        
+        return {
+            "metadata": {
+                "name": name,
+                "description": f"LLM generated CFD specification",
+                "version": "1.0"
+            },
+            "geometry": {
+                "type": geom_type,
+                "dimensions": {
+                    "characteristic_length": L
+                },
+                "domain": geometry.get("domain", {
+                    "upstream": 10,
+                    "downstream": 30,
+                    "lateral": 10
+                })
+            },
+            "flow": {
+                "regime": regime,
+                "reynolds_number": re_val,
+                "time_dependence": time_dep,
+                "turbulence_model": turb_model
+            },
+            "fluid": {
+                "name": fluid.get("name", "air"),
+                "density": rho,
+                "kinematic_viscosity": nu
+            },
+            "solver": {
+                "type": solver_type,
+                "algorithm": "PIMPLE" if time_dep == "transient" else "SIMPLE",
+                "max_iterations": 5000,
+                "convergence_criteria": {"p": 1e-5, "U": 1e-5}
+            },
+            "time": {
+                "end_time": 2.0,
+                "delta_t": 0.0001,
+                "adjustable_time_step": True,
+                "max_courant": 1.0,
+                "write_interval": 0.1
+            } if time_dep == "transient" else None,
+            "mesh": raw.get("mesh", {
+                "resolution": "medium",
+                "boundary_layer": {"enabled": True, "num_layers": 10}
+            }),
+            "boundaries": {
+                "inlet": {"type": "velocity_inlet", "velocity": velocity},
+                "outlet": {"type": "pressure_outlet", "pressure": 0},
+                "walls": {"type": "no_slip"},
+                "symmetry": {"planes": ["front", "back"]} if "2d" in geom_type else None
+            },
+            "initial_conditions": {
+                "velocity": velocity,
+                "pressure": 0
+            },
+            "outputs": raw.get("outputs", {
+                "fields": ["p", "U"],
+                "derived_quantities": ["drag_coefficient", "lift_coefficient"]
+            }),
+            "execution": raw.get("execution", {"parallel": False, "num_processors": 1})
+        }
     
     def _mock_conversion(self, prompt: str) -> LLMConversionResponse:
         """Rule-based conversion when LLM is not available."""
