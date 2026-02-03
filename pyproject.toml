@@ -1,7 +1,3 @@
-"""
-Configuration files for code quality and linting
-"""
-
 [build-system]
 requires = ["setuptools>=65.0"]
 build-backend = "setuptools.build_meta"

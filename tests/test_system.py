@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 # Add app to path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.schemas import (
     CFDSpecification, Metadata, Geometry, GeometryType, 

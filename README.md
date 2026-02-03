@@ -1,6 +1,39 @@
-# LLM-Driven OpenFOAM Orchestration System v2.0
+# LLM-Driven OpenFOAM Orchestration System
 
-A production-ready system that converts natural language descriptions into validated OpenFOAM CFD simulations with comprehensive physics validation, security enforcement, and automated post-processing.
+> **Transform natural language into production-ready CFD simulations**
+
+[![Tests](https://img.shields.io/badge/tests-37%20passed-brightgreen)]()
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue)]()
+[![OpenFOAM](https://img.shields.io/badge/OpenFOAM-v11-orange)]()
+[![License](https://img.shields.io/badge/license-MIT-green)]()
+
+A complete system that bridges the gap between human intent and computational fluid dynamics (CFD) simulations. Simply describe what you want to simulate in plain English, and the system automatically generates, validates, and executes OpenFOAM cases.
+
+## 🚀 Quick Example
+
+```python
+# Input: Natural language
+prompt = "Simulate laminar flow around a 2D cylinder at Reynolds 100"
+
+# Output: Complete CFD simulation with results
+# → Velocity field (U), Pressure field (p), Derived quantities
+```
+
+**Result:**
+```
+✓ LLM Conversion (confidence: 0.85)
+✓ Physics Validation: PASSED
+✓ Security Validation: PASSED  
+✓ blockMesh: 882 points, 400 cells
+✓ foamRun: 6 time steps (0 → 0.5s)
+✓ Results: U, p, phi fields at /tmp/foam_test/cylinder_test/
+```
+
+## 📖 Documentation
+
+- **[Complete User Guide](docs/USER_GUIDE.md)** - Full documentation, API reference, use cases
+- **[Pipeline Architecture](docs/PIPELINE_DOCUMENTATION.md)** - Technical implementation details
+- **[Test Results](TEST_RESULTS.md)** - Comprehensive test coverage
 
 ## 🏗️ Architecture
 

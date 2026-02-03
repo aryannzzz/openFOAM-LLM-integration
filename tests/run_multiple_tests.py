@@ -11,7 +11,7 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def run_openfoam_command(cmd, case_dir, timeout=300):
     """Run an OpenFOAM command with proper environment"""
